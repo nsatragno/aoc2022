@@ -19,7 +19,6 @@ fn main() {
 
     elves.sort_by(|a, b| b.partial_cmp(a).unwrap());
     let mut iter = elves.iter();
-    let solution =
-        iter.next().unwrap() + iter.next().unwrap() + iter.next().unwrap();
+    let solution = iter.next().unwrap() + iter.next().unwrap() + iter.next().unwrap();
     println!("{}", solution);
 }
