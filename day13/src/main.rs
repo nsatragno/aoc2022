@@ -6,13 +6,6 @@ enum Entry {
     List(Vec<Entry>),
 }
 
-#[derive(PartialEq)]
-enum SortResult {
-    Sorted,
-    NotSorted,
-    Inconclusive,
-}
-
 impl Clone for Entry {
     fn clone(&self) -> Self {
         match self {
@@ -21,8 +14,6 @@ impl Clone for Entry {
         }
     }
 }
-
-     
 
 impl Entry {
     fn from(string: &str) -> Entry {
@@ -71,37 +62,46 @@ impl Entry {
         }
     }
 }
-fn is_sorted(left: &Entry, right: &Entry) -> SortResult {
-    if let (Entry::Number(left), Entry::Number(right)) = (left, right) {
-        return if left < right {
-            SortResult::Sorted
-        } else if left == right {
-            SortResult::Inconclusive
-        } else {
-            SortResult::NotSorted
-        }
-    }
-    let left = left.normalize();
-    let right = right.normalize();
 
-    let mut left = left.iter();
-    let mut right = right.iter();
-    while let Some(left) = left.next() {
-        if let Some(right) = right.next() {
-            match is_sorted(left, right) {
-                SortResult::Inconclusive => continue,
-                any => return any,
+impl PartialEq for Entry {
+    fn eq(&self, other: &Self) -> bool {
+        self.partial_cmp(other).unwrap() == std::cmp::Ordering::Equal
+    }
+}
+
+impl PartialOrd for Entry {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if let (Entry::Number(left), Entry::Number(right)) = (self, other) {
+            return if left < right {
+                Some(std::cmp::Ordering::Less)
+            } else if left == right {
+                Some(std::cmp::Ordering::Equal)
+            } else {
+                Some(std::cmp::Ordering::Greater)
             }
-        } 
-        // Right side ran out of items first.
-        return SortResult::NotSorted;
+        }
+        let left = self.normalize();
+        let right = other.normalize();
+
+        let mut left = left.iter();
+        let mut right = right.iter();
+        while let Some(left) = left.next() {
+            if let Some(right) = right.next() {
+                match left.partial_cmp(right) {
+                    Some(std::cmp::Ordering::Equal) => continue,
+                    any => return any,
+                }
+            } 
+            // Right side ran out of items first.
+            return Some(std::cmp::Ordering::Greater);
+        }
+        if right.next().is_some() {
+            // Left side ran out of items first.
+            return Some(std::cmp::Ordering::Less);
+        }
+        // Both lists had the same number of items.
+        return Some(std::cmp::Ordering::Equal);
     }
-    if right.next().is_some() {
-        // Left side ran out of items first.
-        return SortResult::Sorted;
-    }
-    // Both lists had the same number of items.
-    SortResult::Inconclusive
 }
 
 fn main() {
@@ -114,7 +114,7 @@ fn main() {
             (packets.next().unwrap(), packets.next().unwrap())
         })
         .enumerate()
-        .filter(|(_, packet_pair)| is_sorted(&packet_pair.0, &packet_pair.1) == SortResult::Sorted)
+        .filter(|(_, packet_pair)| packet_pair.0.partial_cmp(&packet_pair.1).unwrap() != std::cmp::Ordering::Greater)
         .fold(0, |sum, (index, _)| sum + index + 1);
 
     println!("The result is {}", result);
