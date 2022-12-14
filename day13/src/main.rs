@@ -63,9 +63,17 @@ impl Entry {
     }
 }
 
+impl Eq for Entry {}
+
 impl PartialEq for Entry {
     fn eq(&self, other: &Self) -> bool {
         self.partial_cmp(other).unwrap() == std::cmp::Ordering::Equal
+    }
+}
+
+impl Ord for Entry {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        return self.partial_cmp(other).unwrap();
     }
 }
 
@@ -78,7 +86,7 @@ impl PartialOrd for Entry {
                 Some(std::cmp::Ordering::Equal)
             } else {
                 Some(std::cmp::Ordering::Greater)
-            }
+            };
         }
         let left = self.normalize();
         let right = other.normalize();
@@ -91,7 +99,7 @@ impl PartialOrd for Entry {
                     Some(std::cmp::Ordering::Equal) => continue,
                     any => return any,
                 }
-            } 
+            }
             // Right side ran out of items first.
             return Some(std::cmp::Ordering::Greater);
         }
@@ -114,8 +122,28 @@ fn main() {
             (packets.next().unwrap(), packets.next().unwrap())
         })
         .enumerate()
-        .filter(|(_, packet_pair)| packet_pair.0.partial_cmp(&packet_pair.1).unwrap() != std::cmp::Ordering::Greater)
+        .filter(|(_, packet_pair)| {
+            packet_pair.0.partial_cmp(&packet_pair.1).unwrap() != std::cmp::Ordering::Greater
+        })
         .fold(0, |sum, (index, _)| sum + index + 1);
 
+    println!("Part 1");
+    println!("The result is {}", result);
+
+    let separators = vec![Entry::from("[[2]])"), Entry::from("[[6]]")];
+    let mut entries: Vec<Entry> = file
+        .trim()
+        .split('\n')
+        .filter(|line| !line.trim().is_empty())
+        .map(Entry::from)
+        .chain(separators.clone())
+        .collect();
+    entries.sort_unstable();
+    let result = entries
+        .iter()
+        .enumerate()
+        .filter(|(_, entry)| separators.contains(entry))
+        .fold(1, |accumulator, (index, _)| accumulator * (index + 1));
+    println!("Part 2");
     println!("The result is {}", result);
 }
