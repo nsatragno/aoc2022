@@ -80,13 +80,7 @@ impl Ord for Entry {
 impl PartialOrd for Entry {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         if let (Entry::Number(left), Entry::Number(right)) = (self, other) {
-            return if left < right {
-                Some(std::cmp::Ordering::Less)
-            } else if left == right {
-                Some(std::cmp::Ordering::Equal)
-            } else {
-                Some(std::cmp::Ordering::Greater)
-            };
+            return left.partial_cmp(right);
         }
         let left = self.normalize();
         let right = other.normalize();
