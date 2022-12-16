@@ -1,9 +1,14 @@
-use std::{collections::{HashMap, HashSet}, fs, ops::RangeInclusive, str::Chars};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    ops::RangeInclusive,
+    str::Chars,
+};
 
-type Coordinate = (i32, i32);
+type Coordinate = (i64, i64);
 
-const TARGET_Y: i32 = 2_000_000;
-//const TARGET_Y: i32 = 10;
+const TARGET_Y: i64 = 2_000_000;
+const SEARCH_RANGE: i64 = 4_000_000;
 
 struct Sensor {
     position: Coordinate,
@@ -13,7 +18,7 @@ struct Sensor {
 impl Sensor {
     fn from(string: &str) -> Sensor {
         let mut string = string.chars();
-        fn find_number(string: &mut Chars) -> i32 {
+        fn find_number(string: &mut Chars) -> i64 {
             let mut number = String::new();
             while let Some(char) = string.next() {
                 if char.is_numeric() {
@@ -38,16 +43,31 @@ impl Sensor {
     }
 }
 
-fn distance(sensor: &Sensor) -> i32 {
+fn distance(sensor: &Sensor) -> i64 {
     (sensor.position.0.abs_diff(sensor.beacon.0) + sensor.position.1.abs_diff(sensor.beacon.1))
-        as i32
+        as i64
+}
+
+fn spaces(row: &Vec<RangeInclusive<i64>>, beacons: &Option<&HashSet<i64>>) -> i64 {
+    let mut result = 0;
+    for range in row {
+        result += range.end() - range.start() + 1;
+        if let Some(beacons) = beacons {
+            for beacon in *beacons {
+                if beacon >= range.start() && beacon <= range.end() {
+                    result -= 1;
+                }
+            }
+        }
+    }
+    result
 }
 
 fn main() {
     let file = fs::read_to_string("input.txt").unwrap();
     let sensors: Vec<Sensor> = file.trim().split('\n').map(Sensor::from).collect();
-    let mut map: HashMap<i32, Vec<RangeInclusive<i32>>> = HashMap::new();
-    let mut beacons: HashMap<i32, HashSet<i32>> = HashMap::new();
+    let mut map: HashMap<i64, Vec<RangeInclusive<i64>>> = HashMap::new();
+    let mut beacons: HashMap<i64, HashSet<i64>> = HashMap::new();
     println!("Processing sensors");
     let mut i = 0;
     for sensor in &sensors {
@@ -60,7 +80,7 @@ fn main() {
         }
         let distance = distance(sensor);
         for y in sensor.position.1 - distance..=sensor.position.1 + distance {
-            let distance = distance - (y.abs_diff(sensor.position.1)) as i32;
+            let distance = distance - (y.abs_diff(sensor.position.1)) as i64;
             let range = sensor.position.0 - distance..=sensor.position.0 + distance;
             if let Some(existing) = map.get_mut(&y) {
                 existing.push(range);
@@ -71,23 +91,12 @@ fn main() {
     }
 
     println!("Finding maximums");
-    let mut min_x = i32::MAX;
-    let mut min_y = i32::MAX;
+    let mut min_x = i64::MAX;
     let mut max_x = 0;
-    let mut max_y = 0;
     for range in map.values().flatten() {
         max_x = max_x.max(*range.end());
         min_x = min_x.min(*range.start());
     }
-    for point in map.keys() {
-        min_y = min_x.min(*point);
-        max_y = max_x.max(*point);
-    }
-
-    println!("Min X: {}", min_x);
-    println!("Max X: {}", max_x);
-    println!("Min Y: {}", min_y);
-    println!("Min Y: {}", max_y);
 
     // Fuse the rows together.
     println!("Fusing rows together");
@@ -95,7 +104,7 @@ fn main() {
     let row_total = map.len();
     for row in map.values_mut() {
         row_n += 1;
-        if row_n % 10_000 == 0  {
+        if row_n % 10_000 == 0 {
             println!("Row {} of {}", row_n, row_total);
         }
         let mut i = 0;
@@ -139,21 +148,32 @@ fn main() {
             }
             i += 1;
         }
+        row.sort_unstable_by(|a, b| a.start().cmp(b.start()));
     }
 
-    println!("Finding result");
-    let mut result = 0;
-    let row = &map[&TARGET_Y];
-    for range in row {
-        result += range.end() - range.start() + 1;
-        if let Some(beacons) = beacons.get(&TARGET_Y) {
-            for beacon in beacons {
-                if beacon >= range.start() && beacon <= range.end() {
-                    result -= 1;
-                }
-            }
+    println!("Part 1");
+    println!(
+        "The result is {}",
+        spaces(&map[&TARGET_Y], &beacons.get(&TARGET_Y))
+    );
+
+    println!("Part 2");
+    for y in 0..=SEARCH_RANGE {
+        let row = &map[&y];
+        if row.len() != 2 {
+            continue;
         }
+        let first = &row[0];
+        let second = &row[1];
+        if second.start() - first.end() != 2 {
+            continue;
+        }
+        if *first.start() >= 0 || *second.end() <= SEARCH_RANGE {
+            continue;
+        }
+        let x = first.end() + 1;
+        println!("A result is ({}, {})", x, y);
+        println!("The tuning frequency is {}", x * 4_000_000 + y);
     }
-
-    println!("The result is {result}");
+    println!("Done.");
 }
