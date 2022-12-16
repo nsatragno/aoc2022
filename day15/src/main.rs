@@ -1,8 +1,7 @@
-use std::{fs, str::Chars, collections::HashMap};
+use std::{collections::{HashMap, HashSet}, fs, ops::RangeInclusive, str::Chars};
 
 type Coordinate = (i32, i32);
 
-const DEBUG: bool = false;
 const TARGET_Y: i32 = 2_000_000;
 //const TARGET_Y: i32 = 10;
 
@@ -47,82 +46,114 @@ fn distance(sensor: &Sensor) -> i32 {
 fn main() {
     let file = fs::read_to_string("input.txt").unwrap();
     let sensors: Vec<Sensor> = file.trim().split('\n').map(Sensor::from).collect();
-    let mut map: HashMap<Coordinate, char> = HashMap::new();
-
-
+    let mut map: HashMap<i32, Vec<RangeInclusive<i32>>> = HashMap::new();
+    let mut beacons: HashMap<i32, HashSet<i32>> = HashMap::new();
+    println!("Processing sensors");
     let mut i = 0;
     for sensor in &sensors {
         i += 1;
-        println!("Sensor {} / {}", i, sensors.len());
-        map.insert(sensor.position, 'S');
-        map.insert(sensor.beacon, 'B');
-
+        println!("Sensor {} of {}", i, sensors.len());
+        if let Some(existing) = beacons.get_mut(&sensor.beacon.1) {
+            existing.insert(sensor.beacon.0);
+        } else {
+            beacons.insert(sensor.beacon.1, HashSet::from([sensor.beacon.0]));
+        }
         let distance = distance(sensor);
-        /*for x in sensor.position.0 - distance..=sensor.position.0 + distance {
-            let distance = distance - (x.abs_diff(sensor.position.0)) as i32;
-            for y in sensor.position.1 - distance..=sensor.position.1 + distance {
-                if y == TARGET_Y {
-                    if map.get(&(x, y)).is_none() {
-                        map.insert((x, y), '#');
-                    }
-                }
-            }
-        }*/
         for y in sensor.position.1 - distance..=sensor.position.1 + distance {
-            if y != TARGET_Y {
-                continue;
-            }
             let distance = distance - (y.abs_diff(sensor.position.1)) as i32;
-            for x in sensor.position.0 - distance..=sensor.position.0 + distance {
-                if map.get(&(x, y)).is_none() {
-                    map.insert((x, y), '#');
-                }
+            let range = sensor.position.0 - distance..=sensor.position.0 + distance;
+            if let Some(existing) = map.get_mut(&y) {
+                existing.push(range);
+            } else {
+                map.insert(y, vec![range]);
             }
         }
     }
 
+    println!("Finding maximums");
     let mut min_x = i32::MAX;
     let mut min_y = i32::MAX;
     let mut max_x = 0;
     let mut max_y = 0;
-    for point in map.keys() {
-        min_x = min_x.min(point.0);
-        min_y = min_y.min(point.1);
-        max_x = max_x.max(point.0);
-        max_y = max_y.max(point.1);
+    for range in map.values().flatten() {
+        max_x = max_x.max(*range.end());
+        min_x = min_x.min(*range.start());
     }
-    let mut count = 0;
-    for x in min_x..=max_x {
-        let point = map.get(&(x, TARGET_Y));
-        if let Some(point) = point {
-            if *point == '#' || *point == 'S' {
-                count += 1;
-            }
-        }
+    for point in map.keys() {
+        min_y = min_x.min(*point);
+        max_y = max_x.max(*point);
     }
 
-    if DEBUG {
-        print!("  ");
-        for x in min_x..=max_x {
-            if x % 5 == 0 {
-                print!("{:2} ", x);
-            } else {
-                print!(" ");
-            }
+    println!("Min X: {}", min_x);
+    println!("Max X: {}", max_x);
+    println!("Min Y: {}", min_y);
+    println!("Min Y: {}", max_y);
+
+    // Fuse the rows together.
+    println!("Fusing rows together");
+    let mut row_n = 0;
+    let row_total = map.len();
+    for row in map.values_mut() {
+        row_n += 1;
+        if row_n % 10_000 == 0  {
+            println!("Row {} of {}", row_n, row_total);
         }
-        print!("\n");
-        for y in min_y..=max_y {
-            print!("{:2} ", y);
-            for x in min_x..=max_x {
-                if let Some(value) = map.get(&(x, y)) {
-                    print!("{}", value);
+        let mut i = 0;
+        while i < row.len() {
+            let mut j = 0;
+            while j < row.len() {
+                if i == j {
+                    j += 1;
+                    continue;
+                }
+                if row[i].start() <= row[j].start() && row[i].end() >= row[j].start() {
+                    // Overlapping on the left.
+                    row[i] = *row[i].start()..=*row[i].end().max(row[j].end());
+                    row.remove(j);
+                    if i > j {
+                        i -= 1;
+                    }
+                } else if row[i].start() <= row[j].end() && row[i].end() >= row[j].end() {
+                    // Overlapping on the right.
+                    row[i] = *row[i].start().min(row[j].start())..=*row[i].end();
+                    row.remove(j);
+                    if i > j {
+                        i -= 1;
+                    }
+                } else if row[i].start() >= row[j].start() && row[i].end() <= row[j].end() {
+                    // Inside.
+                    row[i] = row[j].clone();
+                    row.remove(j);
+                    if i > j {
+                        i -= 1;
+                    }
+                } else if row[i].start() <= row[j].start() && row[i].end() >= row[j].end() {
+                    // Outside.
+                    row.remove(j);
+                    if i > j {
+                        i -= 1;
+                    }
                 } else {
-                    print!(".");
+                    j += 1;
                 }
             }
-            print!("\n");
+            i += 1;
         }
     }
 
-    println!("The count is {count}");
+    println!("Finding result");
+    let mut result = 0;
+    let row = &map[&TARGET_Y];
+    for range in row {
+        result += range.end() - range.start() + 1;
+        if let Some(beacons) = beacons.get(&TARGET_Y) {
+            for beacon in beacons {
+                if beacon >= range.start() && beacon <= range.end() {
+                    result -= 1;
+                }
+            }
+        }
+    }
+
+    println!("The result is {result}");
 }
