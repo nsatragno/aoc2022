@@ -1,108 +1,131 @@
-use std::fs;
+use std::{fs};
 
-type Coordinate = (i32, i32);
-type Field = Vec<[bool; 7]>;
+type Field = Vec<u8>;
 
-const BLOCKS: usize = 2022;
-// const BLOCKS_PART_2: usize = 1_000_000_000_000;
+const BLOCKS: usize = 10;
 const BLOCKS_PART_2: usize = 2022;
+// const BLOCKS_PART_2: usize = 1_000_000_000_000;
 
-struct Piece<'a> {
-    shape: &'a Vec<Coordinate>,
-    position: Coordinate,
+struct Piece {
+    shape: Vec<u8>,
+    position: usize,
 }
 
-impl<'a> Piece<'a> {
-    fn from(shape: &'a Vec<Coordinate>, ceiling: i32) -> Piece<'a> {
+impl Piece {
+    fn from(shape: Vec<u8>, ceiling: usize) -> Piece {
         Piece {
             shape,
-            position: (2, 3 + ceiling),
+            position: 3 + ceiling,
         }
     }
 
-    fn maybe_move(&mut self, direction: Coordinate, field: &mut Field) -> bool {
-        let can_move = !self
-            .shape
-            .iter()
-            .map(|pixel| {
-                (
-                    self.position.0 + direction.0 + pixel.0,
-                    self.position.1 + direction.1 + pixel.1,
-                )
-            })
-            .any(|coordinate| {
-                coordinate.0 < 0
-                    || coordinate.0 > 6
-                    || coordinate.1 < 0
-                    || field[coordinate.1 as usize][coordinate.0 as usize]
-            });
-        if can_move {
-            self.position.0 += direction.0;
-            self.position.1 += direction.1;
+    fn maybe_move_left(&mut self, field: &mut Field) -> bool {
+        for index in 0..self.shape.len() {
+            let line = self.shape[index];
+            if line & 0b1000000 != 0 {
+                return false;
+            }
+            let line = line << 1;
+            if (field[index + self.position] & line) != 0 {
+                return false;
+            }
         }
-        can_move
+        for index in 0..self.shape.len() {
+            self.shape[index] <<= 1;
+        }
+        true
+    }
+
+    fn maybe_move_right(&mut self, field: &mut Field) -> bool {
+        for index in 0..self.shape.len() {
+            let line = self.shape[index];
+            if line & 0b0000001 != 0 {
+                return false;
+            }
+            let line = line >> 1;
+            if (field[index + self.position] & line) != 0 {
+                return false;
+            }
+        }
+        for index in 0..self.shape.len() {
+            self.shape[index] >>= 1;
+        }
+        true
+    }
+
+    fn maybe_move_down(&mut self, field: &mut Field) -> bool {
+        if self.position <= 0 {
+            return false;
+        }
+        for index in 0..self.shape.len() {
+            let line = self.shape[index];
+            if (field[index + self.position - 1] & line) != 0 {
+                return false;
+            }
+        }
+        self.position -= 1;
+        true
     }
 
     fn paint(&self, field: &mut Field) {
-        for pixel in self.shape {
-            let position = (pixel.0 + self.position.0, pixel.1 + self.position.1);
-            assert!(!field[position.1 as usize][position.0 as usize]);
-            field[position.1 as usize][position.0 as usize] = true;
+        for index in 0..self.shape.len() {
+            let line = self.shape[index];
+            field[index + self.position] |= line;
         }
-    }
-
-    fn top(&self) -> usize {
-        self.shape
-            .iter()
-            .map(|pixel| (pixel.1 + self.position.1) as usize)
-            .max()
-            .unwrap()
     }
 }
 
 fn solve(iterations: usize) {
-    let line: Vec<Coordinate> = vec![(0, 0), (1, 0), (2, 0), (3, 0)];
-    let cross: Vec<Coordinate> = vec![(1, 0), (0, 1), (1, 1), (2, 1), (1, 2)];
-    let l: Vec<Coordinate> = vec![(0, 0), (1, 0), (2, 0), (2, 1), (2, 2)];
-    let stick: Vec<Coordinate> = vec![(0, 0), (0, 1), (0, 2), (0, 3)];
-    let square: Vec<Coordinate> = vec![(0, 0), (0, 1), (1, 0), (1, 1)];
+    let line: Vec<u8> = vec![0b0011110];
+    let cross: Vec<u8> = vec![0b0001000, 0b0011100, 0b0001000];
+    let l: Vec<u8> = vec![0b0011100,0b0000100, 0b0000100];
+    let stick: Vec<u8> = vec![0b0010000,0b0010000,0b0010000,0b0010000];
+    let square: Vec<u8> = vec![0b0011000, 0b0011000];
     let shapes = vec![line, cross, l, stick, square];
     let mut shapes = shapes.iter().cycle();
 
     let input = fs::read_to_string("input.txt").unwrap();
-    let mut directions = input
+    let directions: Vec<i32> = input
         .trim()
         .bytes()
         .map(|character| match character {
             b'>' => 1,
             b'<' => -1,
             _ => panic!("Unknown character {}", character),
-        })
-        .cycle();
+        }).collect();
 
     let mut field: Field = Vec::new();
     let mut ceiling = 0;
+    let mut direction_index = 0;
     for iteration in 0..iterations {
         if iteration % 1024 == 0 {
             let done: f32 = iteration as f32 / iterations as f32;
             println!("%{:02.02}", done * 100 as f32)
         }
         let shape = shapes.next().unwrap();
-        let mut piece = Piece::from(shape, ceiling);
-        if piece.top() + 1 > field.len() {
-            field.resize(piece.top() + 1, [false; 7]);
+        let mut piece = Piece::from(shape.clone(), ceiling);
+        if piece.position + 5 > field.len() {
+            field.resize(piece.position + 5, 0);
         }
         loop {
-            let direction = directions.next().unwrap();
-            piece.maybe_move((direction, 0), &mut field);
-            if !piece.maybe_move((0, -1), &mut field) {
+            let direction = directions[direction_index];
+            if direction == -1 {
+                piece.maybe_move_left(&mut field);
+            } else {
+                piece.maybe_move_right(&mut field);
+            }
+            direction_index += 1;
+            if direction_index >= directions.len() {
+                direction_index = 0;
+            }
+            if !piece.maybe_move_down(&mut field) {
                 break;
             }
         }
         piece.paint(&mut field);
         for (index, line) in field.iter().enumerate().rev() {
-            if line.contains(&true) {
-                ceiling = index as i32 + 1;
+            if *line != 0 {
+                ceiling = index + 1;
                 break;
             }
         }
