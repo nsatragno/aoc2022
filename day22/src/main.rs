@@ -34,12 +34,6 @@ impl Row {
     }
 }
 
-#[derive(PartialEq)]
-enum Mode {
-    Flat,
-    Cube,
-}
-
 #[derive(Debug)]
 struct Map {
     rows: Vec<Row>,
@@ -67,7 +61,7 @@ impl Map {
         }
     }
 
-    fn walk(&self, path: &Path, mut position: Position, mode: Mode) -> Position {
+    fn walk(&self, path: &Path, mut position: Position) -> Position {
         for instruction in &path.instructions {
             match instruction {
                 Instruction::Left => position.turn_left(),
@@ -75,11 +69,7 @@ impl Map {
                 Instruction::Forward(steps) => {
                     for _ in 0..*steps {
                         let mut next = position.peek();
-                        if mode == Mode::Flat {
-                            next = self.maybe_wrap(next);
-                        } else {
-                            next = self.maybe_wrap_cube(next);
-                        }
+                        next = self.maybe_wrap(next);
                         if self.is_occupied(&next) {
                             break;
                         }
@@ -115,11 +105,6 @@ impl Map {
                 position.step();
             }
         }
-        position
-    }
-
-    fn maybe_wrap_cube(&self, mut position: Position) -> Position {
-        todo!();
         position
     }
 }
@@ -273,14 +258,7 @@ fn main() {
     println!("Starting position: {}", starting_position);
 
     println!("Part 1");
-    let finish_position = map.walk(&path, starting_position.clone(), Mode::Flat);
-    println!("Finish position: {}", &finish_position);
-
-    let result = finish_position.to_result();
-    println!("         Result: {}", result);
-
-    println!("Part 2");
-    let finish_position = map.walk(&path, starting_position, Mode::Cube);
+    let finish_position = map.walk(&path, starting_position.clone());
     println!("Finish position: {}", &finish_position);
 
     let result = finish_position.to_result();
