@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, HashSet},
-    fs,
 };
 
 type Coordinate = (i32, i32);
@@ -43,7 +42,7 @@ impl Direction {
 }
 
 fn main() {
-    let file = fs::read_to_string("input.txt").unwrap();
+    let file = include_str!("../input.txt");
     let mut map: HashSet<Coordinate> = file
         .trim()
         .split('\n')
@@ -105,7 +104,7 @@ fn main() {
         map = new_map;
         directions.rotate_left(1);
 
-        if round == 10 {
+        if round == ROUNDS {
             let mut min_x = i32::MAX;
             let mut max_x = i32::MIN;
             let mut min_y = i32::MAX;
