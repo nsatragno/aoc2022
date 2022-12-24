@@ -1,0 +1,24 @@
+set xrange [-16:16]
+set xlabel "X"
+show xlabel
+
+set yrange [-16:16]
+set ylabel "Y"
+show ylabel
+
+set zrange [-16:16]
+set zlabel "Z"
+show zlabel
+
+splot "points0.txt"
+pause 1
+splot "points1.txt"
+pause 1
+splot "points2.txt"
+pause 1
+splot "points3.txt"
+pause 1
+splot "points4.txt"
+pause 1
+splot "points5.txt"
+pause -1
