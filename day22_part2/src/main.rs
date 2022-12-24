@@ -87,25 +87,25 @@ fn fold_cube_from(
             (-1, 0) => ([
                 (destination.0, destination.1),
                 (destination.0, destination.1 + width - 1),
-            ], (destination.0 - 1, destination.1)),
+            ], (destination.0, destination.1 + 1)),
 
             // Right:
             (1, 0) => ([
                 (destination.0 + width - 1, destination.1 + width - 1),
                 (destination.0 + width - 1, destination.1),
-            ], (destination.0 + width, destination.1)),
+            ], (destination.0 + width - 1, destination.1)),
 
             // Up:
             (0, -1) => ([
                 (destination.0, destination.1),
                 (destination.0 + width - 1, destination.1),
-            ], (destination.0, destination.1 - 1)),
+            ], (destination.0, destination.1)),
 
             // Down:
             (0, 1) => ([
                 (destination.0, destination.1 + width - 1),
                 (destination.0 + width - 1, destination.1 + width - 1),
-            ], (destination.0, destination.1 + width)),
+            ], (destination.0 + width, destination.1 + width - 1)),
             _ => unreachable!(),
         };
         println!("Folding {:?}", direction);

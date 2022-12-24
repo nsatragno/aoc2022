@@ -11,14 +11,14 @@ set zlabel "Z"
 show zlabel
 
 splot "points0.txt"
-pause 1
+pause -1
 splot "points1.txt"
-pause 1
+pause -1
 splot "points2.txt"
-pause 1
+pause -1
 splot "points3.txt"
-pause 1
+pause -1
 splot "points4.txt"
-pause 1
+pause -1
 splot "points5.txt"
 pause -1
