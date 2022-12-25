@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, ops::Bound};
+use std::{collections::{HashMap}, fs};
 
 use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D};
 
@@ -76,7 +76,7 @@ impl BoundingBox {
     }
 }
 
-fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) {
+fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64, elf: Point3D<i64>) {
     unsafe {
         static mut NUM: usize = 0;
         let mut s = String::new();
@@ -88,6 +88,7 @@ fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) {
             }
             s += &format!("\n\n");
         }
+        s += &format!("{}, {}, {}\n\n", elf.x, elf.y, elf.z);
         fs::write(format!("points{}.txt", NUM), s).unwrap();
         NUM += 1;
     }
@@ -126,13 +127,13 @@ fn fold_cube(
     flat_map: &HashMap<Coordinate, bool>,
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
-) -> HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>> {
+) -> HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>> {
     println!("Folding cube");
     let corner_a = &top_right_corner(flat_map);
     println!("The top right corner is {:?}", corner_a);
-    let mut normals: HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>> = HashMap::new();
+    let mut normals: HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>> = HashMap::new();
     for point in map.values() {
-        normals.insert(point.clone(), Vector3D::from((0, 0, 1)));
+        normals.insert(point.clone(), Vector3D::from((0f64, 0f64, 1f64)));
     }
 
     fold_cube_from(corner_a, &(-1, -1), flat_map, map, width, &mut normals);
@@ -145,7 +146,7 @@ fn fold_cube_from(
     flat_map: &HashMap<Coordinate, bool>,
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
-    normals: &mut HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>>,
+    normals: &mut HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
 ) {
     for direction in DIRECTIONS {
         let new_destination = (
@@ -208,29 +209,43 @@ fn fold_cube_from(
         println!("Rotation axis: {:?}", axis);
 
         let normal = normals[&map[&new_destination]];
-        let normal = Vector3D::from((normal.x as f64, normal.y as f64, normal.z as f64));
         let normal = rotation.transform_vector3d(normal);
-        let normal = Vector3D::from((normal.x.round() as i64, normal.y.round() as i64, normal.z.round() as i64));
-        println!("Normal: {:?}", normal);
+        println!("Normal: {}, {}, {}", normal.x.round(), normal.y.round(), normal.z.round());
 
         for tile in attached {
             let point = map[&tile];
             let point = point - rotation_translation;
-            let point = Point3D::from((point.x as f64, point.y as f64, point.z as f64));
-            let point = rotation.transform_point3d(point);
-            let point = Point3D::from((
-                point.x.round() as i64,
-                point.y.round() as i64,
-                point.z.round() as i64,
-            ));
+            let point = rotate_point(&point, &rotation);
             let point = point + rotation_translation;
             let point = point - close_distance_transation;
             map.insert(tile.clone(), point);
             normals.insert(point, normal);
         }
-        write_map(map, width);
+        write_map(map, width, Point3D::from((0, 0, 0)));
         fold_cube_from(&new_destination, destination, flat_map, map, width, normals);
     }
+}
+
+fn rotate_point(point: &Point3D<i64>, transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>) -> Point3D<i64> {
+    let point = Point3D::from((point.x as f64, point.y as f64, point.z as f64));
+    let point = transform.transform_point3d(point);
+    let point = Point3D::from((
+        point.x.round() as i64,
+        point.y.round() as i64,
+        point.z.round() as i64,
+    ));
+    point
+}
+
+fn rotate_vector(point: &Vector3D<i64, UnknownUnit>, transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>) -> Vector3D<i64, UnknownUnit> {
+    let point = Vector3D::from((point.x as f64, point.y as f64, point.z as f64));
+    let point = transform.transform_vector3d(point);
+    let point = Vector3D::from((
+        point.x.round() as i64,
+        point.y.round() as i64,
+        point.z.round() as i64,
+    ));
+    point
 }
 
 fn find_attached(
@@ -267,29 +282,46 @@ fn find_attached(
     attached
 }
 
-fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>>, path: Path) -> Coordinate {
+fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>, path: Path, width: i64) -> Coordinate {
     let position = top_right_corner(flat_map);
-    let position = map[&position];
+    let mut position = map[&position];
 
-    let map: HashMap<Point3D<i64>, bool> = map.iter().map(|(coordinate, point3d)| (*point3d, flat_map[coordinate])).collect();
-    let direction: Vector3D<i64, UnknownUnit> = Vector3D::from((1, 0, 0));
-
+    let map_3d: HashMap<Point3D<i64>, bool> = map.iter().map(|(coordinate, point3d)| (*point3d, flat_map[coordinate])).collect();
+    let mut direction: Vector3D<i64, UnknownUnit> = Vector3D::from((1, 0, 0));
 
     for instruction in &path.instructions {
         let normal = normals[&position];
         match instruction {
             Instruction::Left => {
-                let rotation = Rotation3D::around_axis(normal, 90);
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(90f64));
+                direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Right => {
-                //position.turn_right(),
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(-90f64));
+                direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Forward(steps) => {
+                for _ in 0..*steps {
+                    let next = position + direction;
+                    if let Some(obstacle) = map_3d.get(&next) {
+                        if *obstacle {
+                            break;
+                        }
+                        position = next;
+                        write_map(map, width, position);
+                    } else {
+                        // Wrap around.
+                        direction = Vector3D::from((normal.x as i64, normal.y as i64, normal.z as i64));
+                        position = next + direction;
+                        write_map(map, width, position);
+                        assert!(map_3d.get(&position).is_some());
+                    }
+                }
             }
         }
     }
 
-    (0, 0)
+    *map.iter().find(|(_, point)| **point == position).unwrap().0
 }
 
 fn main() {
@@ -326,12 +358,12 @@ fn main() {
         .collect();
 
     // Fold the cube.
-    write_map(&map, width);
+    write_map(&map, width, Point3D::from((0, 0, 0)));
     let normals = fold_cube(&flat_map, &mut map, width);
 
     // Parse the path.
     let path = Path::from(parts.next().unwrap());
 
-    let result = walk(&flat_map, &map, &normals, path);
+    let result = walk(&flat_map, &map, &normals, path, width);
     println!("The result is {:?}", result);
 }
