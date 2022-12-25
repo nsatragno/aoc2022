@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    fmt::Display
+    fmt::Display,
 };
 
 type Coordinate = (usize, usize);
@@ -168,7 +168,11 @@ struct Step {
     step: usize,
 }
 
-fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, map: Map) -> (usize, Map) {
+fn find_shortest_path(
+    initial_position: Coordinate,
+    final_position: Coordinate,
+    map: Map,
+) -> (usize, Map) {
     let mut cache: HashSet<Step> = HashSet::new();
     let mut queue = VecDeque::from([Step {
         position: initial_position,
@@ -202,8 +206,9 @@ fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, 
             Direction::East,
             Direction::West,
         ] {
-            if next.position.1 == 0 && direction == Direction::North ||
-               next.position.1 == map.height - 1 && direction == Direction::South {
+            if next.position.1 == 0 && direction == Direction::North
+                || next.position.1 == map.height - 1 && direction == Direction::South
+            {
                 // Special case for the initial position.
                 continue;
             }
@@ -234,5 +239,8 @@ fn main() {
 
     let (second_path, map) = find_shortest_path(final_position, initial_position, map);
     let (third_path, _) = find_shortest_path(initial_position, final_position, map);
-    println!("The second part result is {}", first_path + second_path + third_path);
+    println!(
+        "The second part result is {}",
+        first_path + second_path + third_path
+    );
 }
