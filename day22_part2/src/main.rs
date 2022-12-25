@@ -1,38 +1,35 @@
-use std::{
-    collections::{HashMap},
-    fs, ops::Bound,
-};
+use std::{collections::HashMap, fs, ops::Bound};
 
-use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D };
+use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D};
 
 type Coordinate = (i64, i64);
 
 const DIRECTIONS: &'static [(i64, i64)] = &[(-1, 0), (1, 0), (0, 1), (0, -1)];
 
 struct BoundingBox {
-       min_x: i64,
-       max_x: i64,
-       min_y: i64,
-       max_y: i64,
-   }
-   
-   impl BoundingBox {
-       fn from(map: &HashMap<Coordinate, bool>) -> BoundingBox {
-           let mut bounding_box = BoundingBox {
-               min_x: i64::MAX,
-               max_x: 0,
-               min_y: i64::MAX,
-               max_y: 0,
-           };
-           for coordinate in map.keys() {
-               bounding_box.min_x = bounding_box.min_x.min(coordinate.0);
-               bounding_box.max_x = bounding_box.max_x.max(coordinate.0);
-               bounding_box.min_y = bounding_box.min_y.min(coordinate.1);
-               bounding_box.max_y = bounding_box.max_y.max(coordinate.1);
-           }
-           bounding_box
-       }
+    min_x: i64,
+    max_x: i64,
+    min_y: i64,
+    max_y: i64,
+}
+
+impl BoundingBox {
+    fn from(map: &HashMap<Coordinate, bool>) -> BoundingBox {
+        let mut bounding_box = BoundingBox {
+            min_x: i64::MAX,
+            max_x: 0,
+            min_y: i64::MAX,
+            max_y: 0,
+        };
+        for coordinate in map.keys() {
+            bounding_box.min_x = bounding_box.min_x.min(coordinate.0);
+            bounding_box.max_x = bounding_box.max_x.max(coordinate.0);
+            bounding_box.min_y = bounding_box.min_y.min(coordinate.1);
+            bounding_box.max_y = bounding_box.max_y.max(coordinate.1);
+        }
+        bounding_box
     }
+}
 
 fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) {
     unsafe {
@@ -51,8 +48,10 @@ fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) {
     }
 }
 
-
-fn colour_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) -> HashMap<i64, Vec<Point3D<i64>>> {
+fn colour_map(
+    map: &HashMap<Coordinate, Point3D<i64>>,
+    width: i64,
+) -> HashMap<i64, Vec<Point3D<i64>>> {
     let mut colours: HashMap<i64, Vec<Point3D<i64>>> = HashMap::new();
     let bounding_box = BoundingBox::from(&map.keys().map(|k| (k.clone(), false)).collect());
     for x in 0..=bounding_box.max_x {
@@ -69,7 +68,6 @@ fn colour_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64) -> HashMap<i6
     }
     colours
 }
-
 
 fn fold_cube(
     flat_map: &HashMap<Coordinate, bool>,
@@ -137,9 +135,17 @@ fn fold_cube_from(
 
         let rotation_translation = map[&axis[0]].to_vector();
         let close_distance_transation = map[&destination] - map[&new_destination];
-        let close_distance_transation: Vector3D<f64, UnknownUnit> = Vector3D::from((close_distance_transation.x as f64, close_distance_transation.y as f64, close_distance_transation.z as f64));
+        let close_distance_transation: Vector3D<f64, UnknownUnit> = Vector3D::from((
+            close_distance_transation.x as f64,
+            close_distance_transation.y as f64,
+            close_distance_transation.z as f64,
+        ));
         let close_distance_transation = close_distance_transation.normalize();
-        let close_distance_transation: Vector3D<i64, UnknownUnit> = Vector3D::from((close_distance_transation.x.round() as i64, close_distance_transation.y.round() as i64, close_distance_transation.z.round() as i64));
+        let close_distance_transation: Vector3D<i64, UnknownUnit> = Vector3D::from((
+            close_distance_transation.x.round() as i64,
+            close_distance_transation.y.round() as i64,
+            close_distance_transation.z.round() as i64,
+        ));
 
         let axis = map[&axis[1]] - map[&axis[0]];
         let axis = Vector3D::from((axis.x as f64, axis.y as f64, axis.z as f64));
@@ -153,7 +159,11 @@ fn fold_cube_from(
             let point = point - rotation_translation;
             let point = Point3D::from((point.x as f64, point.y as f64, point.z as f64));
             let point = rotation.transform_point3d(point);
-            let point = Point3D::from((point.x.round() as i64, point.y.round() as i64, point.z.round() as i64));
+            let point = Point3D::from((
+                point.x.round() as i64,
+                point.y.round() as i64,
+                point.z.round() as i64,
+            ));
             let point = point + rotation_translation;
             let point = point - close_distance_transation;
             map.insert(tile.clone(), point);
