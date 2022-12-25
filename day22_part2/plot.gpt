@@ -1,35 +1,27 @@
-set xrange [-16:16]
-set xlabel "X"
 show xlabel
-
-set yrange [-16:16]
-set ylabel "Y"
 show ylabel
-
-set zrange [-16:16]
-set zlabel "Z"
 show zlabel
 
 
 file = "points0.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
-pause -1
+pause 1
 
 file = "points1.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
-pause -1
+pause 1
 
 file = "points2.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
-pause -1
+pause 1
 
 file = "points3.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
-pause -1
+pause 1
 
 file = "points4.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
-pause -1
+pause 1
 
 file = "points5.txt"
 splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6

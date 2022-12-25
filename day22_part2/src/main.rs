@@ -6,6 +6,51 @@ type Coordinate = (i64, i64);
 
 const DIRECTIONS: &'static [(i64, i64)] = &[(-1, 0), (1, 0), (0, 1), (0, -1)];
 
+#[derive(Debug)]
+enum Instruction {
+    Forward(i32),
+    Left,
+    Right,
+}
+
+impl Instruction {
+    fn from(string: &str) -> Instruction {
+        match string {
+            "L" => Instruction::Left,
+            "R" => Instruction::Right,
+            number => Instruction::Forward(number.parse().unwrap()),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Path {
+    instructions: Vec<Instruction>,
+}
+
+impl Path {
+    fn from(string: &str) -> Path {
+        let mut instructions = Vec::new();
+        let mut string = string.trim().chars();
+        let mut number = String::new();
+        while let Some(next) = string.next() {
+            if next.is_digit(10) {
+                number.push(next);
+            } else {
+                if !number.is_empty() {
+                    instructions.push(Instruction::from(&number));
+                    number.clear();
+                }
+                instructions.push(Instruction::from(&next.to_string()));
+            }
+        }
+        if !number.is_empty() {
+            instructions.push(Instruction::from(&number));
+        }
+        Path { instructions }
+    }
+}
+
 struct BoundingBox {
     min_x: i64,
     max_x: i64,
@@ -69,23 +114,29 @@ fn colour_map(
     colours
 }
 
+fn top_right_corner(flat_map: &HashMap<Coordinate, bool>) -> Coordinate {
+    *flat_map
+        .keys()
+        .filter(|a| a.1 == 0)
+        .reduce(|a, b| if a.0 < b.0 { a } else { b })
+        .unwrap()
+}
+
 fn fold_cube(
     flat_map: &HashMap<Coordinate, bool>,
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
-) {
+) -> HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>> {
     println!("Folding cube");
-
-    // Find the top-right corner.
-    let corner_a = flat_map
-        .keys()
-        .filter(|a| a.1 == 0)
-        .reduce(|a, b| if a.0 < b.0 { a } else { b })
-        .unwrap();
-
+    let corner_a = &top_right_corner(flat_map);
     println!("The top right corner is {:?}", corner_a);
+    let mut normals: HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>> = HashMap::new();
+    for point in map.values() {
+        normals.insert(point.clone(), Vector3D::from((0, 0, 1)));
+    }
 
-    fold_cube_from(corner_a, &(-1, -1), flat_map, map, width);
+    fold_cube_from(corner_a, &(-1, -1), flat_map, map, width, &mut normals);
+    normals
 }
 
 fn fold_cube_from(
@@ -94,6 +145,7 @@ fn fold_cube_from(
     flat_map: &HashMap<Coordinate, bool>,
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
+    normals: &mut HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>>,
 ) {
     for direction in DIRECTIONS {
         let new_destination = (
@@ -154,6 +206,13 @@ fn fold_cube_from(
             Rotation3D::around_axis(axis, Angle::degrees(90f64));
         println!("Translation vector : {:?}", rotation_translation);
         println!("Rotation axis: {:?}", axis);
+
+        let normal = normals[&map[&new_destination]];
+        let normal = Vector3D::from((normal.x as f64, normal.y as f64, normal.z as f64));
+        let normal = rotation.transform_vector3d(normal);
+        let normal = Vector3D::from((normal.x.round() as i64, normal.y.round() as i64, normal.z.round() as i64));
+        println!("Normal: {:?}", normal);
+
         for tile in attached {
             let point = map[&tile];
             let point = point - rotation_translation;
@@ -167,9 +226,10 @@ fn fold_cube_from(
             let point = point + rotation_translation;
             let point = point - close_distance_transation;
             map.insert(tile.clone(), point);
+            normals.insert(point, normal);
         }
         write_map(map, width);
-        fold_cube_from(&new_destination, destination, flat_map, map, width);
+        fold_cube_from(&new_destination, destination, flat_map, map, width, normals);
     }
 }
 
@@ -207,6 +267,31 @@ fn find_attached(
     attached
 }
 
+fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<i64, UnknownUnit>>, path: Path) -> Coordinate {
+    let position = top_right_corner(flat_map);
+    let position = map[&position];
+
+    let map: HashMap<Point3D<i64>, bool> = map.iter().map(|(coordinate, point3d)| (*point3d, flat_map[coordinate])).collect();
+    let direction: Vector3D<i64, UnknownUnit> = Vector3D::from((1, 0, 0));
+
+
+    for instruction in &path.instructions {
+        let normal = normals[&position];
+        match instruction {
+            Instruction::Left => {
+                let rotation = Rotation3D::around_axis(normal, 90);
+            }
+            Instruction::Right => {
+                //position.turn_right(),
+            }
+            Instruction::Forward(steps) => {
+            }
+        }
+    }
+
+    (0, 0)
+}
+
 fn main() {
     let file = include_str!("../input.txt");
     let mut parts = file.split("\n\n");
@@ -240,6 +325,13 @@ fn main() {
         })
         .collect();
 
+    // Fold the cube.
     write_map(&map, width);
-    fold_cube(&flat_map, &mut map, width);
+    let normals = fold_cube(&flat_map, &mut map, width);
+
+    // Parse the path.
+    let path = Path::from(parts.next().unwrap());
+
+    let result = walk(&flat_map, &map, &normals, path);
+    println!("The result is {:?}", result);
 }
