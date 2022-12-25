@@ -4,7 +4,7 @@ use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D};
 
 type Coordinate = (i64, i64);
 
-const DIRECTIONS: &'static [(i64, i64)] = &[(-1, 0), (1, 0), (0, 1), (0, -1)];
+const DIRECTIONS: &'static [(i64, i64)] = &[(1, 0), (0, 1), (-1, 0), (0, -1)];
 
 #[derive(Debug)]
 enum Instruction {
@@ -131,17 +131,31 @@ fn fold_cube(
     flat_map: &HashMap<Coordinate, bool>,
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
-) -> HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>> {
+) -> (
+    HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
+    HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>>,
+) {
     println!("Folding cube");
     let corner_a = &top_right_corner(flat_map);
     println!("The top right corner is {:?}", corner_a);
     let mut normals: HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>> = HashMap::new();
-    for point in map.values() {
-        normals.insert(point.clone(), Vector3D::from((0f64, 0f64, 1f64)));
+    let mut rotations: HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>> =
+        HashMap::new();
+    for point in map.iter() {
+        rotations.insert(point.0.clone(), Rotation3D::identity());
+        normals.insert(point.1.clone(), Vector3D::from((0f64, 0f64, 1f64)));
     }
 
-    fold_cube_from(corner_a, &(-1, -1), flat_map, map, width, &mut normals);
-    normals
+    fold_cube_from(
+        corner_a,
+        &(-1, -1),
+        flat_map,
+        map,
+        width,
+        &mut normals,
+        &mut rotations,
+    );
+    (normals, rotations)
 }
 
 fn fold_cube_from(
@@ -151,6 +165,7 @@ fn fold_cube_from(
     map: &mut HashMap<Coordinate, Point3D<i64>>,
     width: i64,
     normals: &mut HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
+    rotations: &mut HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>>,
 ) {
     for direction in DIRECTIONS {
         let new_destination = (
@@ -229,9 +244,18 @@ fn fold_cube_from(
             let point = point - close_distance_transation;
             map.insert(tile.clone(), point);
             normals.insert(point, normal);
+            rotations.insert(tile, rotations[&tile].then(&rotation));
         }
         write_map(map, width, None);
-        fold_cube_from(&new_destination, destination, flat_map, map, width, normals);
+        fold_cube_from(
+            &new_destination,
+            destination,
+            flat_map,
+            map,
+            width,
+            normals,
+            rotations,
+        );
     }
 }
 
@@ -301,6 +325,7 @@ fn walk(
     flat_map: &HashMap<Coordinate, bool>,
     map: &HashMap<Coordinate, Point3D<i64>>,
     normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
+    rotations: &HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>>,
     path: Path,
     width: i64,
 ) -> i64 {
@@ -373,25 +398,17 @@ fn walk(
 
     println!("Direction in 3D: {:?}", direction);
 
-    let normal = normals[&position];
-    let default_normal = normals[&map[&top_right_corner(flat_map)]];
-    let angle = normal.angle_to(default_normal);
-    let axis = normal.cross(default_normal);
-    let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(axis, -angle);
-    let direction = rotate_vector(&direction, &rotation);
-    println!("Direction in 2D: {:?}", direction);
-    assert_eq!(direction.z, 0);
-    let direction = match (direction.x, direction.y) {
-        // Right:
-        (1, 0) => 0,
-        // Down:
-        (0, 1) => 1,
-        // Left:
-        (-1, 0) => 2,
-        // Up:
-        (0, -1) => 3,
-        _ => unreachable!(),
-    };
+    let rotation = rotations[&final_position];
+    let direction = DIRECTIONS
+        .iter()
+        .map(|direction| rotate_vector(&Vector3D::from((direction.0, direction.1, 0)), &rotation))
+        .enumerate()
+        .inspect(|(_, dir)| println!("Rotated directions: {:?}", dir))
+        .find(|(_, a)| *a == direction)
+        .unwrap()
+        .0 as i64;
+
+    println!("Direction value in 2D: {}", direction);
 
     1000 * row + 4 * column + direction
 }
@@ -431,11 +448,11 @@ fn main() {
 
     // Fold the cube.
     write_map(&map, width, None);
-    let normals = fold_cube(&flat_map, &mut map, width);
+    let (normals, rotations) = fold_cube(&flat_map, &mut map, width);
 
     // Parse the path.
     let path = Path::from(parts.next().unwrap());
 
-    let result = walk(&flat_map, &map, &normals, path, width);
+    let result = walk(&flat_map, &map, &normals, &rotations, path, width);
     println!("The result is {:?}", result);
 }
