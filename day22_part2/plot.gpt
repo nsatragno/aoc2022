@@ -10,15 +10,27 @@ set zrange [-16:16]
 set zlabel "Z"
 show zlabel
 
-splot "points0.txt"
+
+file = "points0.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
-splot "points1.txt"
+
+file = "points1.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
-splot "points2.txt"
+
+file = "points2.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
-splot "points3.txt"
+
+file = "points3.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
-splot "points4.txt"
+
+file = "points4.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
-splot "points5.txt"
+
+file = "points5.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6
 pause -1
