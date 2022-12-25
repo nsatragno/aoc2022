@@ -76,19 +76,23 @@ impl BoundingBox {
     }
 }
 
-fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64, elf: Point3D<i64>) {
+fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64, elf: Option<Point3D<i64>>) {
     unsafe {
         static mut NUM: usize = 0;
         let mut s = String::new();
 
         let colours = colour_map(map, width);
-        for colour in colours.values() {
-            for point in colour {
+        let mut colour_indices: Vec<&i64> = colours.keys().collect();
+        colour_indices.sort();
+        for colour in colour_indices {
+            for point in &colours[colour] {
                 s += &format!("{}, {}, {}\n", point.x, point.y, point.z);
             }
             s += &format!("\n\n");
         }
-        s += &format!("{}, {}, {}\n\n", elf.x, elf.y, elf.z);
+        if let Some(elf) = elf {
+            s += &format!("{}, {}, {}\n\n", elf.x, elf.y, elf.z);
+        }
         fs::write(format!("points{}.txt", NUM), s).unwrap();
         NUM += 1;
     }
@@ -221,7 +225,7 @@ fn fold_cube_from(
             map.insert(tile.clone(), point);
             normals.insert(point, normal);
         }
-        write_map(map, width, Point3D::from((0, 0, 0)));
+        write_map(map, width, None);
         fold_cube_from(&new_destination, destination, flat_map, map, width, normals);
     }
 }
@@ -282,7 +286,7 @@ fn find_attached(
     attached
 }
 
-fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>, path: Path, width: i64) -> Coordinate {
+fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>, path: Path, width: i64) -> i64 {
     let position = top_right_corner(flat_map);
     let mut position = map[&position];
 
@@ -290,38 +294,83 @@ fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<
     let mut direction: Vector3D<i64, UnknownUnit> = Vector3D::from((1, 0, 0));
 
     for instruction in &path.instructions {
-        let normal = normals[&position];
+        let mut normal = normals[&position];
         match instruction {
             Instruction::Left => {
-                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(90f64));
+                println!("Turning left!");
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(-90f64));
                 direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Right => {
-                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(-90f64));
+                println!("Turning right!");
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(90f64));
                 direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Forward(steps) => {
                 for _ in 0..*steps {
-                    let next = position + direction;
+                    let mut next = position + direction;
                     if let Some(obstacle) = map_3d.get(&next) {
                         if *obstacle {
+                            println!("Bonk!");
                             break;
                         }
+                        println!("Forward!");
                         position = next;
-                        write_map(map, width, position);
+                        write_map(map, width, Some(position));
                     } else {
                         // Wrap around.
-                        direction = Vector3D::from((normal.x as i64, normal.y as i64, normal.z as i64));
-                        position = next + direction;
-                        write_map(map, width, position);
-                        assert!(map_3d.get(&position).is_some());
+                        println!("Wrapping around!");
+                        let maybe_direction = Vector3D::from((normal.x as i64, normal.y as i64, normal.z as i64));
+                        next = next + maybe_direction;
+                        if map_3d[&next] {
+                            println!("Bonk!");
+                            break;
+                        }
+                        println!("Wrapped!");
+                        direction = maybe_direction;
+                        position = next;
+                        write_map(map, width, Some(position));
+                        normal = normals[&position];
                     }
                 }
             }
         }
     }
 
-    *map.iter().find(|(_, point)| **point == position).unwrap().0
+    println!("Finished");
+
+    let final_position = *map.iter().find(|(_, point)| **point == position).unwrap().0;
+    println!("Final position in 2D: {:?}", final_position);
+    println!("Final position in 3D: {:?}", position);
+
+    let column = final_position.0 + 1;
+    let row = final_position.1 + 1;
+    println!("Column: {}", column);
+    println!("Row: {}", row);
+
+    println!("Direction in 3D: {:?}", direction);
+
+    let normal = normals[&position];
+    let default_normal = normals[&map[&top_right_corner(flat_map)]];
+    let angle = normal.angle_to(default_normal);
+    let axis = normal.cross(default_normal);
+    let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(axis, -angle);
+    let direction = rotate_vector(&direction, &rotation);
+    println!("Direction in 2D: {:?}", direction);
+    assert_eq!(direction.z, 0);
+    let direction = match (direction.x, direction.y) {
+        // Right:
+        (1, 0) => 0,
+        // Down:
+        (0, 1) => 1,
+        // Left:
+        (-1, 0) => 2,
+        // Up:
+        (0, -1) => 3,
+        _ => unreachable!(),
+    };
+
+    1000 * row + 4 * column + direction
 }
 
 fn main() {
@@ -358,7 +407,7 @@ fn main() {
         .collect();
 
     // Fold the cube.
-    write_map(&map, width, Point3D::from((0, 0, 0)));
+    write_map(&map, width, None);
     let normals = fold_cube(&flat_map, &mut map, width);
 
     // Parse the path.
