@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    fmt::Display,
+    fmt::Display
 };
 
 type Coordinate = (usize, usize);
@@ -162,11 +162,14 @@ impl Map {
     }
 }
 
-fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, map: Map) -> usize {
-    struct Step {
-        position: Coordinate,
-        step: usize,
-    }
+#[derive(PartialEq, Eq, Hash)]
+struct Step {
+    position: Coordinate,
+    step: usize,
+}
+
+fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, map: Map) -> (usize, Map) {
+    let mut cache: HashSet<Step> = HashSet::new();
     let mut queue = VecDeque::from([Step {
         position: initial_position,
         step: 0,
@@ -174,6 +177,10 @@ fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, 
     let mut maps: HashMap<usize, Map> = HashMap::from([(0, map)]);
 
     while let Some(next) = queue.pop_front() {
+        if cache.contains(&next) {
+            continue;
+        }
+
         let map = if let Some(map) = maps.get(&(next.step + 1)) {
             map
         } else {
@@ -195,13 +202,14 @@ fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, 
             Direction::East,
             Direction::West,
         ] {
-            if next.position.1 == 0 && direction == Direction::North {
+            if next.position.1 == 0 && direction == Direction::North ||
+               next.position.1 == map.height - 1 && direction == Direction::South {
                 // Special case for the initial position.
                 continue;
             }
             let position = direction.shift(next.position);
             if position == final_position {
-                return next.step + 1;
+                return (next.step + 1, maps.remove(&(next.step + 1)).unwrap());
             }
             if map.is_valid(position) {
                 queue.push_back(Step {
@@ -210,6 +218,7 @@ fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, 
                 });
             }
         }
+        cache.insert(next);
     }
     unreachable!();
 }
@@ -219,6 +228,11 @@ fn main() {
     let map = Map::from(file);
     let initial_position = (1, 0);
     let final_position = (map.width - 2, map.height - 1);
-    let result = find_shortest_path(initial_position, final_position, map);
-    println!("The result is {result}");
+
+    let (first_path, map) = find_shortest_path(initial_position, final_position, map);
+    println!("The first part result is {}", first_path);
+
+    let (second_path, map) = find_shortest_path(final_position, initial_position, map);
+    let (third_path, _) = find_shortest_path(initial_position, final_position, map);
+    println!("The second part result is {}", first_path + second_path + third_path);
 }
