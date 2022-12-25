@@ -1,4 +1,4 @@
-use std::{collections::{HashMap}, fs};
+use std::{collections::HashMap, fs};
 
 use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D};
 
@@ -214,7 +214,12 @@ fn fold_cube_from(
 
         let normal = normals[&map[&new_destination]];
         let normal = rotation.transform_vector3d(normal);
-        println!("Normal: {}, {}, {}", normal.x.round(), normal.y.round(), normal.z.round());
+        println!(
+            "Normal: {}, {}, {}",
+            normal.x.round(),
+            normal.y.round(),
+            normal.z.round()
+        );
 
         for tile in attached {
             let point = map[&tile];
@@ -230,7 +235,10 @@ fn fold_cube_from(
     }
 }
 
-fn rotate_point(point: &Point3D<i64>, transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>) -> Point3D<i64> {
+fn rotate_point(
+    point: &Point3D<i64>,
+    transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>,
+) -> Point3D<i64> {
     let point = Point3D::from((point.x as f64, point.y as f64, point.z as f64));
     let point = transform.transform_point3d(point);
     let point = Point3D::from((
@@ -241,7 +249,10 @@ fn rotate_point(point: &Point3D<i64>, transform: &Rotation3D<f64, UnknownUnit, U
     point
 }
 
-fn rotate_vector(point: &Vector3D<i64, UnknownUnit>, transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>) -> Vector3D<i64, UnknownUnit> {
+fn rotate_vector(
+    point: &Vector3D<i64, UnknownUnit>,
+    transform: &Rotation3D<f64, UnknownUnit, UnknownUnit>,
+) -> Vector3D<i64, UnknownUnit> {
     let point = Vector3D::from((point.x as f64, point.y as f64, point.z as f64));
     let point = transform.transform_vector3d(point);
     let point = Vector3D::from((
@@ -286,11 +297,20 @@ fn find_attached(
     attached
 }
 
-fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<i64>>, normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>, path: Path, width: i64) -> i64 {
+fn walk(
+    flat_map: &HashMap<Coordinate, bool>,
+    map: &HashMap<Coordinate, Point3D<i64>>,
+    normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
+    path: Path,
+    width: i64,
+) -> i64 {
     let position = top_right_corner(flat_map);
     let mut position = map[&position];
 
-    let map_3d: HashMap<Point3D<i64>, bool> = map.iter().map(|(coordinate, point3d)| (*point3d, flat_map[coordinate])).collect();
+    let map_3d: HashMap<Point3D<i64>, bool> = map
+        .iter()
+        .map(|(coordinate, point3d)| (*point3d, flat_map[coordinate]))
+        .collect();
     let mut direction: Vector3D<i64, UnknownUnit> = Vector3D::from((1, 0, 0));
 
     for instruction in &path.instructions {
@@ -298,12 +318,14 @@ fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<
         match instruction {
             Instruction::Left => {
                 println!("Turning left!");
-                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(-90f64));
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
+                    Rotation3D::around_axis(normal, Angle::degrees(-90f64));
                 direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Right => {
                 println!("Turning right!");
-                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> = Rotation3D::around_axis(normal, Angle::degrees(90f64));
+                let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
+                    Rotation3D::around_axis(normal, Angle::degrees(90f64));
                 direction = rotate_vector(&direction, &rotation);
             }
             Instruction::Forward(steps) => {
@@ -320,7 +342,8 @@ fn walk(flat_map: &HashMap<Coordinate, bool>, map: &HashMap<Coordinate, Point3D<
                     } else {
                         // Wrap around.
                         println!("Wrapping around!");
-                        let maybe_direction = Vector3D::from((normal.x as i64, normal.y as i64, normal.z as i64));
+                        let maybe_direction =
+                            Vector3D::from((normal.x as i64, normal.y as i64, normal.z as i64));
                         next = next + maybe_direction;
                         if map_3d[&next] {
                             println!("Bonk!");
