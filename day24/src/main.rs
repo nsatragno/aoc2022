@@ -1,8 +1,11 @@
-use std::{collections::HashSet, fmt::Display};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    fmt::Display,
+};
 
 type Coordinate = (usize, usize);
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 enum Direction {
     North,
     South,
@@ -127,33 +130,95 @@ impl Map {
     }
 
     #[allow(dead_code)]
-    fn print(&self) {
+    fn print(&self, position: Coordinate) {
         for y in 0..self.height {
             for x in 0..self.width {
-                let blizzards: Vec<&Blizzard> = self
-                    .blizzards
-                    .iter()
-                    .filter(|blizzard| blizzard.position == (x, y))
-                    .collect();
-                match blizzards.len() {
-                    0 => print!("."),
-                    1 => print!("{}", blizzards[0].direction),
-                    _ => print!("{}", blizzards.len()),
+                if position == (x, y) {
+                    print!("E");
+                } else {
+                    let blizzards: Vec<&Blizzard> = self
+                        .blizzards
+                        .iter()
+                        .filter(|blizzard| blizzard.position == (x, y))
+                        .collect();
+                    match blizzards.len() {
+                        0 => print!("."),
+                        1 => print!("{}", blizzards[0].direction),
+                        _ => print!("{}", blizzards.len()),
+                    }
                 }
             }
             println!("");
         }
         println!("\n");
     }
+
+    fn is_valid(&self, position: Coordinate) -> bool {
+        position.0 > 0
+            && position.0 < self.width - 1
+            && position.1 > 0
+            && position.1 < self.height - 1
+            && !self.occupied.contains(&position)
+    }
+}
+
+fn find_shortest_path(initial_position: Coordinate, final_position: Coordinate, map: Map) -> usize {
+    struct Step {
+        position: Coordinate,
+        step: usize,
+    }
+    let mut queue = VecDeque::from([Step {
+        position: initial_position,
+        step: 0,
+    }]);
+    let mut maps: HashMap<usize, Map> = HashMap::from([(0, map)]);
+
+    while let Some(next) = queue.pop_front() {
+        let map = if let Some(map) = maps.get(&(next.step + 1)) {
+            map
+        } else {
+            let previous_map = &maps[&next.step];
+            let new_map = previous_map.step();
+            maps.insert(next.step + 1, new_map);
+            &maps[&(next.step + 1)]
+        };
+        if map.is_valid(next.position) || next.position.1 == 0 {
+            // Stay in place.
+            queue.push_back(Step {
+                step: next.step + 1,
+                position: next.position,
+            });
+        }
+        for direction in [
+            Direction::North,
+            Direction::South,
+            Direction::East,
+            Direction::West,
+        ] {
+            if next.position.1 == 0 && direction == Direction::North {
+                // Special case for the initial position.
+                continue;
+            }
+            let position = direction.shift(next.position);
+            if position == final_position {
+                return next.step + 1;
+            }
+            if map.is_valid(position) {
+                queue.push_back(Step {
+                    step: next.step + 1,
+                    position,
+                });
+            }
+        }
+    }
+    unreachable!();
 }
 
 fn main() {
     let file = include_str!("../input.txt");
-    let mut map = Map::from(file);
-    map.print();
-
-    for i in 0..10 {
-        map = map.step();
-        map.print();
-    }
+    let map = Map::from(file);
+    let initial_position = (1, 0);
+    let final_position = (map.width - 2, map.height - 1);
+    let result = find_shortest_path(initial_position, final_position, map);
+    println!("The result is {result}");
 }
