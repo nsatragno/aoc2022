@@ -1,3 +1,9 @@
+// Disclaimer:
+// This is by far the worst code I've ever written.
+// It works by folding each face into an actual 3d cube.
+// There is A LOT that could be improved, but making this took WAY too long.
+// Here be dragons.
+
 use std::{collections::HashMap, fs};
 
 use euclid::{default::Point3D, Angle, Rotation3D, UnknownUnit, Vector3D};
@@ -51,6 +57,7 @@ impl Path {
     }
 }
 
+#[allow(dead_code)]
 struct BoundingBox {
     min_x: i64,
     max_x: i64,
@@ -58,6 +65,7 @@ struct BoundingBox {
     max_y: i64,
 }
 
+#[allow(dead_code)]
 impl BoundingBox {
     fn from(map: &HashMap<Coordinate, bool>) -> BoundingBox {
         let mut bounding_box = BoundingBox {
@@ -76,6 +84,7 @@ impl BoundingBox {
     }
 }
 
+#[allow(dead_code)]
 fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64, elf: Option<Point3D<i64>>) {
     unsafe {
         static mut NUM: usize = 0;
@@ -327,6 +336,7 @@ fn walk(
     normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
     rotations: &HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>>,
     path: Path,
+    #[allow(unused_variables)]
     width: i64,
 ) -> i64 {
     let position = top_right_corner(flat_map);
