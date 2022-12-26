@@ -37,5 +37,5 @@ while 1 {
     set view , rotation % 360
     rotation = rotation + 1
     t = t + 1
-    pause 0.01
+    pause 0.005
 }
