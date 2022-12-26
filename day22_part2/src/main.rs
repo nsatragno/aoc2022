@@ -84,29 +84,65 @@ impl BoundingBox {
     }
 }
 
-#[allow(dead_code)]
-fn write_map(map: &HashMap<Coordinate, Point3D<i64>>, width: i64, elf: Option<Point3D<i64>>) {
+#[allow(dead_code, unused_variables)]
+fn write_map_colour(map: &HashMap<Coordinate, Point3D<i64>>, flat_map: &HashMap<Coordinate, bool>, width: i64) {
     unsafe {
         static mut NUM: usize = 0;
-        let mut s = String::new();
+        println!("Printing colour {}", NUM);
 
+        let mut s = String::new();
         let colours = colour_map(map, width);
         let mut colour_indices: Vec<&i64> = colours.keys().collect();
+        let reverse_flat_map: HashMap<Point3D<i64>, bool> = map.iter().map(|(coord, point)| (*point, flat_map[&coord])).collect();
         colour_indices.sort();
         for colour in colour_indices {
             for point in &colours[colour] {
-                s += &format!("{}, {}, {}\n", point.x, point.y, point.z);
+                if reverse_flat_map[point] {
+                    s += &format!("{}, {}, {}\n", point.x, point.y, point.z);
+                }
             }
             s += &format!("\n\n");
-        }
-        if let Some(elf) = elf {
-            s += &format!("{}, {}, {}\n\n", elf.x, elf.y, elf.z);
         }
         fs::write(format!("points{}.txt", NUM), s).unwrap();
         NUM += 1;
     }
 }
 
+#[allow(dead_code, unused_variables)]
+fn write_map(
+    map: &HashMap<Coordinate, Point3D<i64>>,
+    flat_map: &HashMap<Coordinate, bool>,
+    width: i64,
+    elf: Option<Point3D<i64>>,
+) {
+    unsafe {
+        static mut NUM: usize = 96;
+
+        let mut first = String::new();
+        let mut second = String::new();
+        for (point, obstacle) in flat_map {
+            let point = map[point];
+            if *obstacle {
+                first += &format!("{}, {}, {}\n", point.x, point.y, point.z);
+            } else {
+                second += &format!("{}, {}, {}\n", point.x, point.y, point.z);
+            }
+        }
+        let elf = if let Some(elf) = elf {
+            format!("{}, {}, {}\n", elf.x, elf.y, elf.z)
+        } else {
+            String::from("")
+        };
+        fs::write(
+            format!("points{}.txt", NUM),
+            format!("{}\n\n{}\n\n{}", first, second, elf),
+        )
+        .unwrap();
+        NUM += 1;
+    }
+}
+
+#[allow(dead_code)]
 fn colour_map(
     map: &HashMap<Coordinate, Point3D<i64>>,
     width: i64,
@@ -214,7 +250,7 @@ fn fold_cube_from(
         println!("Folding {:?}", direction);
         println!("Folding {} tiles along {:?}", attached.len(), axis);
 
-        let rotation_translation = map[&axis[0]].to_vector();
+        let true_rotation_translation = map[&axis[0]].to_vector();
         let close_distance_transation = map[&destination] - map[&new_destination];
         let close_distance_transation: Vector3D<f64, UnknownUnit> = Vector3D::from((
             close_distance_transation.x as f64,
@@ -231,13 +267,15 @@ fn fold_cube_from(
         let axis = map[&axis[1]] - map[&axis[0]];
         let axis = Vector3D::from((axis.x as f64, axis.y as f64, axis.z as f64));
 
-        let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
+        let true_rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
             Rotation3D::around_axis(axis, Angle::degrees(90f64));
-        println!("Translation vector : {:?}", rotation_translation);
+        let smol_rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
+            Rotation3D::around_axis(axis, Angle::degrees(5f64));
+        println!("Translation vector : {:?}", true_rotation_translation);
         println!("Rotation axis: {:?}", axis);
 
         let normal = normals[&map[&new_destination]];
-        let normal = rotation.transform_vector3d(normal);
+        let normal = true_rotation.transform_vector3d(normal);
         println!(
             "Normal: {}, {}, {}",
             normal.x.round(),
@@ -245,17 +283,27 @@ fn fold_cube_from(
             normal.z.round()
         );
 
-        for tile in attached {
+        let mut fake_map = map.clone();
+        for _ in 0..19 {
+            for tile in &attached {
+                let point = fake_map[&tile];
+                let point = point - true_rotation_translation;
+                let point = rotate_point(&point, &smol_rotation);
+                let point = point + true_rotation_translation;
+                fake_map.insert(tile.clone(), point);
+            }
+            write_map_colour(&fake_map, flat_map, width);
+        }
+        for tile in &attached {
             let point = map[&tile];
-            let point = point - rotation_translation;
-            let point = rotate_point(&point, &rotation);
-            let point = point + rotation_translation;
+            let point = point - true_rotation_translation;
+            let point = rotate_point(&point, &true_rotation);
+            let point = point + true_rotation_translation;
             let point = point - close_distance_transation;
             map.insert(tile.clone(), point);
-            normals.insert(point, normal);
-            rotations.insert(tile, rotations[&tile].then(&rotation));
+            normals.insert(point.clone(), normal);
+            rotations.insert(tile.clone(), rotations[&tile].then(&true_rotation));
         }
-        //write_map(map, width, None);
         fold_cube_from(
             &new_destination,
             destination,
@@ -336,8 +384,7 @@ fn walk(
     normals: &HashMap<Point3D<i64>, Vector3D<f64, UnknownUnit>>,
     rotations: &HashMap<Coordinate, Rotation3D<f64, UnknownUnit, UnknownUnit>>,
     path: Path,
-    #[allow(unused_variables)]
-    width: i64,
+    #[allow(unused_variables)] width: i64,
 ) -> i64 {
     let position = top_right_corner(flat_map);
     let mut position = map[&position];
@@ -360,11 +407,13 @@ fn walk(
                 let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
                     Rotation3D::around_axis(normal, Angle::degrees(-90f64));
                 direction = rotate_vector(&direction, &rotation);
+                write_map(map, flat_map, width, Some(position));
             }
             Instruction::Right => {
                 let rotation: Rotation3D<f64, UnknownUnit, UnknownUnit> =
                     Rotation3D::around_axis(normal, Angle::degrees(90f64));
                 direction = rotate_vector(&direction, &rotation);
+                write_map(map, flat_map, width, Some(position));
             }
             Instruction::Forward(steps) => {
                 for _ in 0..*steps {
@@ -374,7 +423,7 @@ fn walk(
                             break;
                         }
                         position = next;
-                        //write_map(map, width, Some(position));
+                        write_map(map, flat_map, width, Some(position));
                     } else {
                         // Wrap around.
                         let maybe_direction =
@@ -385,7 +434,7 @@ fn walk(
                         }
                         direction = maybe_direction;
                         position = next;
-                        //write_map(map, width, Some(position));
+                        write_map(map, flat_map, width, Some(position));
                         normal = normals[&position];
                     }
                 }
@@ -455,7 +504,7 @@ fn main() {
         .collect();
 
     // Fold the cube.
-    //write_map(&map, width, None);
+    write_map_colour(&map, &flat_map, width);
     let (normals, rotations) = fold_cube(&flat_map, &mut map, width);
 
     // Parse the path.

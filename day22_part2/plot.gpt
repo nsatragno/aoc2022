@@ -1,9 +1,41 @@
-show xlabel
-show ylabel
-show zlabel
+set terminal qt size 1300,1300
 
-do for [t=0:100] {
+set key off
+unset border
+unset xtics
+unset ytics
+unset ztics
+
+rotation = 30
+
+file = "points0.txt"
+splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6 
+pause -1
+
+set view , rotation % 360
+do for [t=0:95] {
     file = sprintf("points%d.txt", t)
-    splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6, file index 6 lt 7
-    pause 0.05
+    splot file index 0 lt 1, file index 1 lt 2, file index 2 lt 3, file index 3 lt 4, file index 4 lt 5, file index 5 lt 6 
+    pause 0.02
+}
+
+pause 1
+
+file = "points95.txt"
+splot file lt 4 lc rgb "#22000022"
+pause 1
+
+t = 97
+
+while 1 {
+    file = sprintf("points%d.txt", t)
+    # index 0 is obstacle
+    # index 1 is free
+    # index 2 is the elf
+    splot file index 0 lt 4 lc rgb "#22000022", file index 2 lt 3 lw 2 lc rgb "#000000ff"
+    
+    set view , rotation % 360
+    rotation = rotation + 1
+    t = t + 1
+    pause 0.01
 }
